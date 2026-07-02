@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\User;
@@ -14,14 +15,16 @@ class AdminController extends Controller {
     // ── Dashboard stats
     public function stats() {
         return response()->json([
-            'total_passagers'    => User::where('role', 'passager')->count(),
-            'total_agents'       => User::where('role', 'agent')->count(),
-            'total_voyages'      => Voyage::count(),
-            'voyages_planifies'  => Voyage::where('statut', 'planifie')->count(),
-            'voyages_en_cours'   => Voyage::where('statut', 'en_cours')->count(),
-            'total_reservations' => Reservation::count(),
-            'total_bagages'      => Bagage::count(),
-            'bagages_perdus'     => Bagage::where('statut', 'perdu')->count(),
+            'total_passagers'      => User::where('role', 'passager')->count(),
+            'total_agents'         => User::where('role', 'agent')->count(),
+            'total_bagagistes'     => User::where('role', 'bagagiste')->count(), // 👈 Ajouté
+            'total_controleurs'    => User::where('role', 'controleur')->count(), // 👈 Ajouté
+            'total_voyages'        => Voyage::count(),
+            'voyages_planifies'    => Voyage::where('statut', 'planifie')->count(),
+            'voyages_en_cours'     => Voyage::where('statut', 'en_cours')->count(),
+            'total_reservations'   => Reservation::count(),
+            'total_bagages'        => Bagage::count(),
+            'bagages_perdus'       => Bagage::where('statut', 'perdu')->count(),
             'signalements_ouverts' => Signalement::where('statut', 'ouvert')->count(),
             'signalements_en_cours'=> Signalement::where('statut', 'en_cours')->count(),
         ]);
@@ -52,7 +55,7 @@ class AdminController extends Controller {
             'email'     => 'required|email|unique:users',
             'telephone' => 'nullable|string',
             'password'  => 'required|min:6',
-            'role'      => 'required|in:passager,agent,admin',
+            'role'      => 'required|in:passager,agent,admin,bagagiste,controleur', // 👈 'bagagiste' et 'controleur' validés ici
         ]);
 
         $user = User::create([
@@ -74,7 +77,7 @@ class AdminController extends Controller {
             'prenom'    => 'string',
             'email'     => 'email|unique:users,email,'.$id,
             'telephone' => 'nullable|string',
-            'role'      => 'in:passager,agent,admin',
+            'role'      => 'in:passager,agent,admin,bagagiste,controleur', // 👈 'bagagiste' et 'controleur' validés ici aussi
         ]);
         $user->update($request->only([
             'nom','prenom','email','telephone','role'
@@ -157,6 +160,7 @@ class AdminController extends Controller {
 
         return response()->json($signalement);
     }
+
     public function getBagages() {
         $bagages = \App\Models\Bagage::with([
             'reservation.user',
