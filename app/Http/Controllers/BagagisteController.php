@@ -1,10 +1,10 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Models\Bagage;
 use App\Models\Reservation;
-use App\Models\Notification;
+use App\Models\Signalement;
+use App\Models\Notification as NotificationModel; // ✅ alias obligatoire
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
@@ -14,7 +14,6 @@ class BagagisteController extends Controller
     // ══════════════════════════════════════════
     // ENREGISTRER UN BAGAGE
     // POST /api/bagagiste/bagages
-    // Body: { reservation_id, poids, description? }
     // ══════════════════════════════════════════
     public function enregistrerBagage(Request $request): JsonResponse
     {
@@ -27,10 +26,9 @@ class BagagisteController extends Controller
         $reservation = Reservation::with(['user', 'voyage'])
             ->findOrFail($request->reservation_id);
 
-        // Vérification que la réservation est confirmée
         if (!in_array($reservation->statut, ['confirmee', 'embarquee'])) {
             return response()->json([
-                'message' => 'Impossible d\'enregistrer un bagage : réservation non confirmée.',
+                'message' => 'Impossible d\'enregistrer : réservation non confirmée.',
             ], 422);
         }
 
@@ -42,8 +40,8 @@ class BagagisteController extends Controller
             'statut'         => 'enregistre',
         ]);
 
-        // Notification au passager
-        Notification::create([
+        // ✅ Notification avec alias
+        NotificationModel::create([
             'user_id' => $reservation->user_id,
             'message' => "🧳 Votre bagage {$bagage->code_qr} ({$request->poids} kg) a été enregistré avec succès.",
             'type'    => 'confirmation',
@@ -58,7 +56,7 @@ class BagagisteController extends Controller
 
     // ══════════════════════════════════════════
     // LISTE DES BAGAGES DU JOUR
-    // GET /api/bagagiste/bagages
+    // GET /api/bagagiste/bagages?statut=en_transit
     // ══════════════════════════════════════════
     public function listeBagages(Request $request): JsonResponse
     {
@@ -72,15 +70,24 @@ class BagagisteController extends Controller
             $query->where('statut', $statut);
         }
 
-        $bagages = $query->orderByDesc('created_at')->get();
+        return response()->json($query->orderByDesc('created_at')->get());
+    }
 
-        return response()->json($bagages);
+    // ══════════════════════════════════════════
+    // DETAIL D'UN BAGAGE
+    // GET /api/bagagiste/bagages/{id}
+    // ══════════════════════════════════════════
+    public function show(int $id): JsonResponse
+    {
+        $bagage = Bagage::with(['reservation.user', 'reservation.voyage'])
+            ->findOrFail($id);
+
+        return response()->json($bagage);
     }
 
     // ══════════════════════════════════════════
     // METTRE À JOUR LE STATUT D'UN BAGAGE
     // PUT /api/bagagiste/bagages/{id}/statut
-    // Body: { statut: 'en_transit'|'arrive'|'recupere'|'perdu' }
     // ══════════════════════════════════════════
     public function updateStatut(Request $request, int $id): JsonResponse
     {
@@ -94,7 +101,7 @@ class BagagisteController extends Controller
         $ancienStatut = $bagage->statut;
         $bagage->update(['statut' => $request->statut]);
 
-        // Messages de notification selon le statut
+        // ✅ Messages de notification avec alias
         $messages = [
             'en_transit' => "🚌 Votre bagage {$bagage->code_qr} est en transit vers {$bagage->reservation->voyage?->destination}.",
             'arrive'     => "✅ Votre bagage {$bagage->code_qr} est arrivé à destination. Présentez-vous au comptoir.",
@@ -110,7 +117,7 @@ class BagagisteController extends Controller
         ];
 
         if (isset($messages[$request->statut]) && $bagage->reservation) {
-            Notification::create([
+            NotificationModel::create([
                 'user_id' => $bagage->reservation->user_id,
                 'message' => $messages[$request->statut],
                 'type'    => $types[$request->statut],
@@ -119,17 +126,16 @@ class BagagisteController extends Controller
         }
 
         return response()->json([
-            'message'       => 'Statut mis à jour.',
-            'bagage'        => $bagage,
-            'ancien_statut' => $ancienStatut,
-            'nouveau_statut'=> $request->statut,
+            'message'        => 'Statut mis à jour.',
+            'bagage'         => $bagage,
+            'ancien_statut'  => $ancienStatut,
+            'nouveau_statut' => $request->statut,
         ]);
     }
 
     // ══════════════════════════════════════════
     // RECHERCHER UNE RÉSERVATION PAR CODE QR
     // POST /api/bagagiste/chercher-reservation
-    // Body: { code_qr: 'RES-XXXX' }
     // ══════════════════════════════════════════
     public function chercherReservation(Request $request): JsonResponse
     {
@@ -143,8 +149,8 @@ class BagagisteController extends Controller
 
         if (!$reservation) {
             return response()->json([
-                'message' => 'Aucune réservation trouvée avec ce code.',
                 'trouve'  => false,
+                'message' => 'Aucune réservation trouvée avec ce code.',
             ], 404);
         }
 
@@ -174,14 +180,92 @@ class BagagisteController extends Controller
     }
 
     // ══════════════════════════════════════════
-    // DETAIL D'UN BAGAGE
-    // GET /api/bagagiste/bagages/{id}
+    // LISTE DES SIGNALEMENTS
+    // GET /api/bagagiste/signalements
     // ══════════════════════════════════════════
-    public function show(int $id): JsonResponse
+    public function listeSignalements(Request $request): JsonResponse
     {
-        $bagage = Bagage::with(['reservation.user', 'reservation.voyage', 'localisations'])
-            ->findOrFail($id);
+        $statut = $request->get('statut');
 
-        return response()->json($bagage);
+        $query = Signalement::with(['user', 'bagage.reservation.voyage'])
+            ->orderByDesc('created_at');
+
+        if ($statut) {
+            $query->where('statut', $statut);
+        }
+
+        return response()->json($query->get());
+    }
+
+    // ══════════════════════════════════════════
+    // METTRE À JOUR STATUT SIGNALEMENT
+    // PUT /api/bagagiste/signalements/{id}/statut
+    // ══════════════════════════════════════════
+    public function updateSignalement(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'statut' => 'required|in:ouvert,en_cours,resolu',
+        ]);
+
+        $signalement = Signalement::with(['user', 'bagage'])->findOrFail($id);
+        $signalement->update(['statut' => $request->statut]);
+
+        // ✅ Notification avec alias
+        if ($request->statut === 'en_cours' && $signalement->user_id) {
+            NotificationModel::create([
+                'user_id' => $signalement->user_id,
+                'message' => "🔍 Votre signalement pour le bagage {$signalement->bagage?->code_qr} est pris en charge. Nous recherchons activement votre bagage.",
+                'type'    => 'prise_en_charge',
+                'lue'     => false,
+            ]);
+        }
+
+        if ($request->statut === 'resolu' && $signalement->user_id) {
+            // Met aussi à jour le statut du bagage
+            if ($signalement->bagage) {
+                $signalement->bagage->update(['statut' => 'recupere']);
+            }
+
+            NotificationModel::create([
+                'user_id' => $signalement->user_id,
+                'message' => "🎉 Bonne nouvelle ! Votre bagage {$signalement->bagage?->code_qr} a été retrouvé et est disponible à la récupération.",
+                'type'    => 'retrouve',
+                'lue'     => false,
+            ]);
+        }
+
+        return response()->json([
+            'message'     => 'Signalement mis à jour.',
+            'signalement' => $signalement,
+        ]);
+    }
+
+    // ══════════════════════════════════════════
+    // CONFIRMER PERTE DÉFINITIVE
+    // PUT /api/bagagiste/signalements/{id}/confirmer-perdu
+    // ══════════════════════════════════════════
+    public function confirmerPerteDefinitive(int $id): JsonResponse
+    {
+        $signalement = Signalement::with(['user', 'bagage'])->findOrFail($id);
+
+        $signalement->update(['statut' => 'resolu']);
+
+        if ($signalement->bagage) {
+            $signalement->bagage->update(['statut' => 'perdu']);
+        }
+
+        // ✅ Notification avec alias
+        if ($signalement->user_id) {
+            NotificationModel::create([
+                'user_id' => $signalement->user_id,
+                'message' => "❌ Votre bagage {$signalement->bagage?->code_qr} a été confirmé perdu définitivement. Contactez l'agence pour plus d'informations.",
+                'type'    => 'perte',
+                'lue'     => false,
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Bagage confirmé perdu définitivement.',
+        ]);
     }
 }

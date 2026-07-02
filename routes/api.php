@@ -14,13 +14,13 @@ use App\Http\Controllers\BagagisteController;
 use App\Http\Controllers\RapportController;
 
 // ════════════════════════════════════════════
-// ROUTES PUBLIQUES (sans authentification)
+// ROUTES PUBLIQUES
 // ════════════════════════════════════════════
 Route::post('/login',    [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 
 // ════════════════════════════════════════════
-// ROUTES PROTÉGÉES (token JWT requis)
+// ROUTES PROTÉGÉES
 // ════════════════════════════════════════════
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -32,48 +32,42 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile',           [ProfileController::class, 'show']);
     Route::put('/profile',           [ProfileController::class, 'update']);
     Route::post('/profile/password', [ProfileController::class, 'changerMotDePasse']);
-    Route::delete('/profile',        [ProfileController::class, 'supprimer']);
 
-    // ── Voyages (lecture pour tous les rôles connectés)
+    // ── Voyages (lecture pour tous)
     Route::get('/voyages',      [VoyageController::class, 'index']);
     Route::get('/voyages/{id}', [VoyageController::class, 'show']);
 
     // ── Notifications (tous rôles)
-    Route::get('/notifications',                     [NotificationController::class, 'index']);
-    Route::get('/notifications/non-lues',            [NotificationController::class, 'nonLues']);
-    Route::put('/notifications/toutes-lues',         [NotificationController::class, 'marquerToutesLues']);
-    Route::put('/notifications/{id}/lue',            [NotificationController::class, 'marquerLue']);
+    Route::get('/notifications',             [NotificationController::class, 'index']);
+    Route::get('/notifications/non-lues',    [NotificationController::class, 'nonLues']);
+    Route::put('/notifications/toutes-lues', [NotificationController::class, 'marquerToutesLues']);
+    Route::put('/notifications/{id}/lue',    [NotificationController::class, 'marquerLue']);
 
     // ════════════════════════════════════════════
     // ESPACE PASSAGER
     // ════════════════════════════════════════════
     Route::middleware('role:passager,admin')->group(function () {
-        // Réservations
-        Route::get('/reservations',      [ReservationController::class, 'index']);
-        Route::post('/reservations',     [ReservationController::class, 'store']);
-        Route::get('/reservations/{id}', [ReservationController::class, 'show']);
+        Route::get('/reservations',         [ReservationController::class, 'index']);
+        Route::post('/reservations',        [ReservationController::class, 'store']);
+        Route::get('/reservations/{id}',    [ReservationController::class, 'show']);
         Route::delete('/reservations/{id}', [ReservationController::class, 'destroy']);
 
-        // Paiements
-        Route::post('/paiements/initier',              [PaiementController::class, 'initier']);
-        Route::post('/paiements/{reference}/confirmer',[PaiementController::class, 'confirmer']);
-        Route::get('/paiements/historique',            [PaiementController::class, 'historique']);
+        Route::post('/paiements/initier',               [PaiementController::class, 'initier']);
+        Route::post('/paiements/{reference}/confirmer', [PaiementController::class, 'confirmer']);
+        Route::get('/paiements/historique',             [PaiementController::class, 'historique']);
 
-        // Bagages (le passager enregistre lui-même depuis l'app)
-        Route::get('/bagages',                  [BagageController::class, 'index']);
-        Route::post('/bagages',                 [BagageController::class, 'store']);
-        Route::get('/bagages/{id}',             [BagageController::class, 'show']);
+        Route::get('/bagages',                   [BagageController::class, 'index']);
+        Route::post('/bagages',                  [BagageController::class, 'store']);
+        Route::get('/bagages/{id}',              [BagageController::class, 'show']);
         Route::post('/bagages/{id}/localisation',[BagageController::class, 'addLocalisation']);
 
-        // Signalements
-        Route::get('/signalements',          [SignalementController::class, 'index']);
-        Route::post('/signalements',         [SignalementController::class, 'store']);
-        Route::get('/signalements/{id}',     [SignalementController::class, 'show']);
+        Route::get('/signalements',      [SignalementController::class, 'index']);
+        Route::post('/signalements',     [SignalementController::class, 'store']);
+        Route::get('/signalements/{id}', [SignalementController::class, 'show']);
     });
 
     // ════════════════════════════════════════════
-    // ESPACE AGENT TERMINAL (embarquement)
-    // Rôles autorisés : agent, admin
+    // ESPACE AGENT TERMINAL
     // ════════════════════════════════════════════
     Route::middleware('role:agent,admin')->prefix('agent')->group(function () {
         Route::post('/scanner',             [AgentController::class, 'scanner']);
@@ -82,48 +76,44 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // ════════════════════════════════════════════
-    // ESPACE AGENT BAGAGISTE (bagages)
-    // Rôles autorisés : bagagiste, admin
+    // ESPACE AGENT BAGAGISTE
     // ════════════════════════════════════════════
     Route::middleware('role:bagagiste,admin')->prefix('bagagiste')->group(function () {
-        Route::post('/bagages',                  [BagagisteController::class, 'enregistrerBagage']);
-        Route::get('/bagages',                   [BagagisteController::class, 'listeBagages']);
-        Route::get('/bagages/{id}',              [BagagisteController::class, 'show']);
-        Route::put('/bagages/{id}/statut',       [BagagisteController::class, 'updateStatut']);
-        Route::post('/chercher-reservation',     [BagagisteController::class, 'chercherReservation']);
-        Route::get('/stats',                     [BagagisteController::class, 'stats']);
+        Route::post('/bagages',                          [BagagisteController::class, 'enregistrerBagage']);
+        Route::get('/bagages',                           [BagagisteController::class, 'listeBagages']);
+        Route::get('/bagages/{id}',                      [BagagisteController::class, 'show']);
+        Route::put('/bagages/{id}/statut',               [BagagisteController::class, 'updateStatut']);
+        Route::post('/chercher-reservation',             [BagagisteController::class, 'chercherReservation']);
+        Route::get('/stats',                             [BagagisteController::class, 'stats']);
+        Route::get('/signalements',                      [BagagisteController::class, 'listeSignalements']);
+        Route::put('/signalements/{id}/statut',          [BagagisteController::class, 'updateSignalement']);
+        Route::put('/signalements/{id}/confirmer-perdu', [BagagisteController::class, 'confirmerPerteDefinitive']);
     });
 
     // ════════════════════════════════════════════
     // ESPACE ADMIN
-    // Rôles autorisés : admin uniquement
     // ════════════════════════════════════════════
     Route::middleware('role:admin')->prefix('admin')->group(function () {
-        // Stats dashboard
         Route::get('/stats', [AdminController::class, 'stats']);
 
-        // Utilisateurs
-        Route::get('/utilisateurs',          [AdminController::class, 'getUtilisateurs']);
-        Route::post('/utilisateurs',         [AdminController::class, 'creerUtilisateur']);
-        Route::put('/utilisateurs/{id}',     [AdminController::class, 'updateUtilisateur']);
-        Route::delete('/utilisateurs/{id}',  [AdminController::class, 'supprimerUtilisateur']);
+        Route::get('/utilisateurs',         [AdminController::class, 'getUtilisateurs']);
+        Route::post('/utilisateurs',        [AdminController::class, 'creerUtilisateur']);
+        Route::put('/utilisateurs/{id}',    [AdminController::class, 'updateUtilisateur']);
+        Route::delete('/utilisateurs/{id}', [AdminController::class, 'supprimerUtilisateur']);
 
-        // Voyages
-        Route::get('/voyages',               [AdminController::class, 'getVoyages']);
-        Route::post('/voyages',              [AdminController::class, 'creerVoyage']);
-        Route::put('/voyages/{id}',          [AdminController::class, 'updateVoyage']);
-        Route::put('/voyages/{id}/statut',   [AdminController::class, 'updateStatutVoyage']);
-        Route::delete('/voyages/{id}',       [AdminController::class, 'supprimerVoyage']);
+        Route::get('/voyages',             [AdminController::class, 'getVoyages']);
+        Route::post('/voyages',            [AdminController::class, 'creerVoyage']);
+        Route::put('/voyages/{id}',        [AdminController::class, 'updateVoyage']);
+        Route::put('/voyages/{id}/statut', [AdminController::class, 'updateStatutVoyage']);
+        Route::delete('/voyages/{id}',     [AdminController::class, 'supprimerVoyage']);
 
-        // Bagages (vue admin)
-        Route::get('/bagages',               [AdminController::class, 'getBagages']);
+        Route::get('/bagages',                          [AdminController::class, 'getBagages']);
+        Route::put('/bagages/{id}/statut',              [AdminController::class, 'updateStatutBagage']);
 
-        // Signalements
         Route::get('/signalements',                          [AdminController::class, 'getSignalements']);
         Route::put('/signalements/{id}/statut',              [AdminController::class, 'updateSignalement']);
         Route::put('/signalements/{id}/confirmer-perdu',     [AdminController::class, 'confirmerBagagePerdu']);
 
-        // Rapports
         Route::get('/rapports/stats', [RapportController::class, 'stats']);
     });
 });
