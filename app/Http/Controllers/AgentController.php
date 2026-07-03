@@ -2,7 +2,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Reservation;
-use App\Models\Notification as NotificationModel; // ✅ alias obligatoire
+use App\Models\Voyage;
+use App\Models\Notification as NotificationModel;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -40,14 +41,12 @@ class AgentController extends Controller
             return response()->json([
                 'valide'      => true,
                 'message'     => '⚠️ Ce passager est déjà embarqué.',
-                'reservation' => $reservation,
+                'reservation' => $this->_formatReservation($reservation),
             ]);
         }
 
-        // ✅ Marque comme embarquée
         $reservation->update(['statut' => 'embarquee']);
 
-        // ✅ Notification — utilise l'alias pour éviter le conflit
         NotificationModel::create([
             'user_id' => $reservation->user_id,
             'message' => "✈️ Embarquement validé ! Bon voyage de {$reservation->voyage->origine} vers {$reservation->voyage->destination}.",
@@ -58,13 +57,14 @@ class AgentController extends Controller
         return response()->json([
             'valide'      => true,
             'message'     => '✅ Embarquement validé avec succès.',
-            'reservation' => $reservation,
+            'reservation' => $this->_formatReservation($reservation),
         ]);
     }
 
     // ══════════════════════════════════════════
     // RÉSERVATIONS DU JOUR
     // GET /api/agent/reservations-du-jour?date=2026-07-01
+    // ✅ Fix : structure voyage correcte (String, pas int)
     // ══════════════════════════════════════════
     public function reservationsDuJour(Request $request): JsonResponse
     {
@@ -76,22 +76,7 @@ class AgentController extends Controller
             })
             ->orderByDesc('created_at')
             ->get()
-            ->map(function ($r) {
-                return [
-                    'id'         => $r->id,
-                    'code_qr'    => $r->code_qr,
-                    'statut'     => $r->statut,
-                    'passager'   => $r->user
-                        ? $r->user->prenom . ' ' . $r->user->nom
-                        : '—',
-                    'voyage'     => $r->voyage
-                        ? $r->voyage->origine . ' → ' . $r->voyage->destination
-                        : '—',
-                    'user'       => $r->user,
-                    'voyage_obj' => $r->voyage,
-                    'created_at' => $r->created_at,
-                ];
-            });
+            ->map(fn($r) => $this->_formatReservation($r));
 
         return response()->json($reservations);
     }
@@ -102,9 +87,7 @@ class AgentController extends Controller
     // ══════════════════════════════════════════
     public function statsDuJour(): JsonResponse
     {
-        $voyage = \App\Models\Voyage::where('statut', 'en_cours')
-            ->orWhere('statut', 'embarquement')
-            ->first();
+        $voyageActif = Voyage::whereIn('statut', ['embarquement', 'en_cours'])->first();
 
         return response()->json([
             'reservations_aujourd_hui' => Reservation::whereDate('created_at', today())->count(),
@@ -112,7 +95,46 @@ class AgentController extends Controller
                 ->where('statut', 'embarquee')->count(),
             'en_attente'               => Reservation::where('statut', 'confirmee')->count(),
             'confirmees'               => Reservation::where('statut', 'confirmee')->count(),
-            'voyage_actif'             => $voyage,
+            'voyage_actif'             => $voyageActif ? [
+                'id'          => $voyageActif->id,
+                'origine'     => (string) $voyageActif->origine,
+                'destination' => (string) $voyageActif->destination,
+                'date_depart' => $voyageActif->date_depart,
+                'statut'      => $voyageActif->statut,
+            ] : null,
         ]);
+    }
+
+    // ══════════════════════════════════════════
+    // HELPER — Formate une réservation proprement
+    // ✅ Garantit que tous les champs String sont bien des String
+    //    pour éviter le TypeError Flutter "String is not a subtype of int"
+    // ══════════════════════════════════════════
+    private function _formatReservation(Reservation $r): array
+    {
+        return [
+            'id'         => (int)    $r->id,
+            'code_qr'    => (string) $r->code_qr,
+            'statut'     => (string) $r->statut,
+            'created_at' => $r->created_at,
+            'user'       => $r->user ? [
+                'id'        => (int)    $r->user->id,
+                'nom'       => (string) $r->user->nom,
+                'prenom'    => (string) $r->user->prenom,
+                'email'     => (string) $r->user->email,
+                'telephone' => (string) ($r->user->telephone ?? ''),
+            ] : null,
+            'voyage' => $r->voyage ? [
+                'id'           => (int)    $r->voyage->id,
+                'origine'      => (string) $r->voyage->origine,      // ✅ forcé String
+                'destination'  => (string) $r->voyage->destination,  // ✅ forcé String
+                'date_depart'  => (string) $r->voyage->date_depart,
+                'date_arrivee' => (string) ($r->voyage->date_arrivee ?? ''),
+                'statut'       => (string) $r->voyage->statut,
+                'capacite'     => (int)    ($r->voyage->capacite ?? 0),
+                'prix'         => (float)  ($r->voyage->prix ?? 0),
+                'type_transport' => (string) ($r->voyage->type_transport ?? 'routier'),
+            ] : null,
+        ];
     }
 }
