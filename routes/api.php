@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VoyageController;
@@ -33,87 +34,131 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/profile',           [ProfileController::class, 'update']);
     Route::post('/profile/password', [ProfileController::class, 'changerMotDePasse']);
 
-    // ── Voyages (lecture pour tous)
-    Route::get('/voyages',      [VoyageController::class, 'index']);
-    Route::get('/voyages/{id}', [VoyageController::class, 'show']);
+    // ── Voyages (lecture seule)
+    Route::resource('voyages', VoyageController::class)
+        ->only(['index','show'])
+        ->names([
+            'index' => 'voyages.public.index',
+            'show'  => 'voyages.public.show',
+        ]);
 
-    // ── Notifications (tous rôles)
-    Route::get('/notifications',             [NotificationController::class, 'index']);
-    Route::get('/notifications/non-lues',    [NotificationController::class, 'nonLues']);
-    Route::put('/notifications/toutes-lues', [NotificationController::class, 'marquerToutesLues']);
-    Route::put('/notifications/{id}/lue',    [NotificationController::class, 'marquerLue']);
+    // ── Notifications
+    Route::get('/notifications',             [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications/non-lues',    [NotificationController::class, 'nonLues'])->name('notifications.nonlues');
+    Route::put('/notifications/toutes-lues', [NotificationController::class, 'marquerToutesLues'])->name('notifications.lues');
+    Route::put('/notifications/{id}/lue',    [NotificationController::class, 'marquerLue'])->name('notifications.lue');
 
     // ════════════════════════════════════════════
     // ESPACE PASSAGER
     // ════════════════════════════════════════════
     Route::middleware('role:passager,admin')->group(function () {
-        Route::get('/reservations',         [ReservationController::class, 'index']);
-        Route::post('/reservations',        [ReservationController::class, 'store']);
-        Route::get('/reservations/{id}',    [ReservationController::class, 'show']);
-        Route::delete('/reservations/{id}', [ReservationController::class, 'destroy']);
+        Route::resource('reservations', ReservationController::class)
+            ->except(['create','edit'])
+            ->names([
+                'index'   => 'passager.reservations.index',
+                'store'   => 'passager.reservations.store',
+                'show'    => 'passager.reservations.show',
+                'update'  => 'passager.reservations.update',
+                'destroy' => 'passager.reservations.destroy',
+            ]);
 
-        Route::post('/paiements/initier',               [PaiementController::class, 'initier']);
-        Route::post('/paiements/{reference}/confirmer', [PaiementController::class, 'confirmer']);
-        Route::get('/paiements/historique',             [PaiementController::class, 'historique']);
+        Route::post('/paiements/initier',               [PaiementController::class, 'initier'])->name('passager.paiements.initier');
+        Route::post('/paiements/{reference}/confirmer', [PaiementController::class, 'confirmer'])->name('passager.paiements.confirmer');
+        Route::get('/paiements/historique',             [PaiementController::class, 'historique'])->name('passager.paiements.historique');
 
-        Route::get('/bagages',                   [BagageController::class, 'index']);
-        Route::post('/bagages',                  [BagageController::class, 'store']);
-        Route::get('/bagages/{id}',              [BagageController::class, 'show']);
-        Route::post('/bagages/{id}/localisation',[BagageController::class, 'addLocalisation']);
+        Route::resource('bagages', BagageController::class)
+            ->except(['create','edit'])
+            ->names([
+                'index'   => 'passager.bagages.index',
+                'store'   => 'passager.bagages.store',
+                'show'    => 'passager.bagages.show',
+                'update'  => 'passager.bagages.update',
+                'destroy' => 'passager.bagages.destroy',
+            ]);
 
-        Route::get('/signalements',      [SignalementController::class, 'index']);
-        Route::post('/signalements',     [SignalementController::class, 'store']);
-        Route::get('/signalements/{id}', [SignalementController::class, 'show']);
+        Route::post('/bagages/{id}/localisation',[BagageController::class, 'addLocalisation'])->name('passager.bagages.localisation');
+
+        Route::resource('signalements', SignalementController::class)
+            ->except(['create','edit'])
+            ->names([
+                'index'   => 'passager.signalements.index',
+                'store'   => 'passager.signalements.store',
+                'show'    => 'passager.signalements.show',
+                'update'  => 'passager.signalements.update',
+                'destroy' => 'passager.signalements.destroy',
+            ]);
     });
 
     // ════════════════════════════════════════════
     // ESPACE AGENT TERMINAL
     // ════════════════════════════════════════════
     Route::middleware('role:agent,admin')->prefix('agent')->group(function () {
-        Route::post('/scanner',             [AgentController::class, 'scanner']);
-        Route::get('/reservations-du-jour', [AgentController::class, 'reservationsDuJour']);
-        Route::get('/stats',                [AgentController::class, 'statsDuJour']);
+        Route::post('/scanner',             [AgentController::class, 'scanner'])->name('agent.scanner');
+        Route::get('/reservations-du-jour', [AgentController::class, 'reservationsDuJour'])->name('agent.reservations.jour');
+        Route::get('/stats',                [AgentController::class, 'statsDuJour'])->name('agent.stats');
     });
 
     // ════════════════════════════════════════════
     // ESPACE AGENT BAGAGISTE
     // ════════════════════════════════════════════
     Route::middleware('role:bagagiste,admin')->prefix('bagagiste')->group(function () {
-        Route::post('/bagages',                          [BagagisteController::class, 'enregistrerBagage']);
-        Route::get('/bagages',                           [BagagisteController::class, 'listeBagages']);
-        Route::get('/bagages/{id}',                      [BagagisteController::class, 'show']);
-        Route::put('/bagages/{id}/statut',               [BagagisteController::class, 'updateStatut']);
-        Route::post('/chercher-reservation',             [BagagisteController::class, 'chercherReservation']);
-        Route::get('/stats',                             [BagagisteController::class, 'stats']);
-        Route::get('/signalements',                      [BagagisteController::class, 'listeSignalements']);
-        Route::put('/signalements/{id}/statut',          [BagagisteController::class, 'updateSignalement']);
-        Route::put('/signalements/{id}/confirmer-perdu', [BagagisteController::class, 'confirmerPerteDefinitive']);
+        Route::post('/bagages',             [BagagisteController::class, 'enregistrerBagage'])->name('bagagiste.bagages.store');
+        Route::get('/bagages',              [BagagisteController::class, 'listeBagages'])->name('bagagiste.bagages.index');
+        Route::get('/bagages/{id}',         [BagagisteController::class, 'show'])->name('bagagiste.bagages.show');
+        Route::put('/bagages/{id}/statut',  [BagagisteController::class, 'updateStatut'])->name('bagagiste.bagages.updateStatut');
+        Route::post('/chercher-reservation',[BagagisteController::class, 'chercherReservation'])->name('bagagiste.reservations.search');
+        Route::get('/stats',                [BagagisteController::class, 'stats'])->name('bagagiste.stats');
+        Route::get('/signalements',         [BagagisteController::class, 'listeSignalements'])->name('bagagiste.signalements.index');
+        Route::put('/signalements/{id}/statut', [BagagisteController::class, 'updateSignalement'])->name('bagagiste.signalements.update');
+        Route::put('/signalements/{id}/confirmer-perdu', [BagagisteController::class, 'confirmerPerteDefinitive'])->name('bagagiste.signalements.perte');
     });
 
     // ════════════════════════════════════════════
     // ESPACE ADMIN
     // ════════════════════════════════════════════
     Route::middleware('role:admin')->prefix('admin')->group(function () {
-        Route::get('/stats', [AdminController::class, 'stats']);
+        Route::get('/stats', [AdminController::class, 'stats'])->name('admin.stats');
 
-        Route::get('/utilisateurs',         [AdminController::class, 'getUtilisateurs']);
-        Route::post('/utilisateurs',        [AdminController::class, 'creerUtilisateur']);
-        Route::put('/utilisateurs/{id}',    [AdminController::class, 'updateUtilisateur']);
-        Route::delete('/utilisateurs/{id}', [AdminController::class, 'supprimerUtilisateur']);
+        Route::resource('utilisateurs', AdminController::class)
+            ->except(['create','edit'])
+            ->names([
+                'index'   => 'admin.utilisateurs.index',
+                'store'   => 'admin.utilisateurs.store',
+                'show'    => 'admin.utilisateurs.show',
+                'update'  => 'admin.utilisateurs.update',
+                'destroy' => 'admin.utilisateurs.destroy',
+            ]);
 
-        Route::get('/voyages',             [AdminController::class, 'getVoyages']);
-        Route::post('/voyages',            [AdminController::class, 'creerVoyage']);
-        Route::put('/voyages/{id}',        [AdminController::class, 'updateVoyage']);
-        Route::put('/voyages/{id}/statut', [AdminController::class, 'updateStatutVoyage']);
-        Route::delete('/voyages/{id}',     [AdminController::class, 'supprimerVoyage']);
+        Route::resource('voyages', AdminController::class)
+            ->except(['create','edit'])
+            ->names([
+                'index'   => 'admin.voyages.index',
+                'store'   => 'admin.voyages.store',
+                'show'    => 'admin.voyages.show',
+                'update'  => 'admin.voyages.update',
+                'destroy' => 'admin.voyages.destroy',
+            ]);
 
-        Route::get('/bagages',                          [AdminController::class, 'getBagages']);
-        Route::put('/bagages/{id}/statut',              [AdminController::class, 'updateStatutBagage']);
+        Route::resource('bagages', AdminController::class)
+            ->except(['create','edit'])
+            ->names([
+                'index'   => 'admin.bagages.index',
+                'store'   => 'admin.bagages.store',
+                'show'    => 'admin.bagages.show',
+                'update'  => 'admin.bagages.update',
+                'destroy' => 'admin.bagages.destroy',
+            ]);
 
-        Route::get('/signalements',                          [AdminController::class, 'getSignalements']);
-        Route::put('/signalements/{id}/statut',              [AdminController::class, 'updateSignalement']);
-        Route::put('/signalements/{id}/confirmer-perdu',     [AdminController::class, 'confirmerBagagePerdu']);
+        Route::resource('signalements', AdminController::class)
+            ->except(['create','edit'])
+            ->names([
+                'index'   => 'admin.signalements.index',
+                'store'   => 'admin.signalements.store',
+                'show'    => 'admin.signalements.show',
+                'update'  => 'admin.signalements.update',
+                'destroy' => 'admin.signalements.destroy',
+            ]);
 
-        Route::get('/rapports/stats', [RapportController::class, 'stats']);
+        Route::get('/rapports/stats', [RapportController::class, 'stats'])->name('admin.rapports.stats');
     });
 });

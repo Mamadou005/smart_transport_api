@@ -1,0 +1,52 @@
+# Blueprint Render — SmartTransport API
+# Déploiement : https://dashboard.render.com/select-repo?type=blueprint
+#
+# Plan gratuit :
+#   - Web Service : 750 h/mois, mise en veille après 15 min d'inactivité
+#   - PostgreSQL  : 1 Go, expire après 90 jours (suffisant pour les tests)
+
+services:
+  - type: web
+    name: smart-transport-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.production
+    region: frankfurt
+    plan: free
+    healthCheckPath: /up
+    autoDeploy: true
+    envVars:
+      - key: APP_NAME
+        value: SmartTransport
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        generateValue: true
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: info
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_SSLMODE
+        value: require
+      - key: DB_URL
+        fromDatabase:
+          name: smart-transport-db
+          property: connectionString
+      - key: SESSION_DRIVER
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: SEED_DATABASE
+        value: "true"
+
+databases:
+  - name: smart-transport-db
+    plan: free
+    databaseName: smart_transport
+    user: smart_transport
+    region: frankfurt

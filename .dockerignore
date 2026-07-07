@@ -1,0 +1,25 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+!.env.render.example
+node_modules
+vendor
+storage/logs/*
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+public/hot
+public/storage
+public/C*
+tests
+.phpunit.cache
+.phpunit.result.cache
+docker-compose.yml
+Dockerfile
+README.md
+DEPLOY.md
+backup.sql
+*.md
+e exec app php artisan tinker
